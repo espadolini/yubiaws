@@ -1,0 +1,16 @@
+linters:
+  enable:
+    - gci
+    - gofumpt
+    - gosec
+
+linters-settings:
+  gci:
+    custom-order: true
+    sections:
+      - standard
+      - default
+      - prefix(github.com/espadolini/yubiaws)
+  gofumpt:
+    extra-rules: true
+    module-path: github.com/espadolini/yubiaws

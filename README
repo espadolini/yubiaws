@@ -1,0 +1,6 @@
+yubiroute53 will use the X.509 certificate and private key in slot 9e of the YubiKey with the given serial number for IAM Roles Anywhere.
+
+Usage:
+```
+yubiroute53 -trust-anchor-arn arn:aws:rolesanywhere:<region>:<account>:trust-anchor/<uuid> -profile-arn arn:aws:rolesanywhere:<region>:<account>:profile/<uuid> -role-arn arn:aws:iam::<account>:role/<path> -serial <yubikey_serial_number> -region <zone_region> -hosted-zone-id <zone_id> -name <record_name> -type <A_or_AAAA> -value <address> -ttl <record_TTL>
+```
