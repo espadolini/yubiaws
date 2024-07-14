@@ -76,7 +76,5 @@ func (c credentials) Retrieve(ctx context.Context) (aws.Credentials, error) {
 	}
 
 	c.params.Certificate = cert
-	c.params.Signer = signer
-
-	return rolesanywhere.CreateSession(ctx, c.params)
+	return rolesanywhere.CreateSessionSigner(ctx, c.params, signer)
 }

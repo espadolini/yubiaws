@@ -7,9 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/ecdsa"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -28,14 +26,22 @@ import (
 type CreateSessionParams struct {
 	Client *http.Client
 
-	Certificate *x509.Certificate
-	Signer      crypto.Signer
+	Certificate     *x509.Certificate
+	HashAndSignFunc func(string) ([]byte, error)
 
 	TrustAnchorARN string
 	ProfileARN     string
 	RoleARN        string
 
 	DurationSeconds int
+}
+
+func CreateSessionSigner(ctx context.Context, params CreateSessionParams, signer crypto.Signer) (aws.Credentials, error) {
+	params.HashAndSignFunc = func(s string) ([]byte, error) {
+		h := sha256.Sum256([]byte(s))
+		return signer.Sign(rand.Reader, h[:], crypto.SHA256)
+	}
+	return CreateSession(ctx, params)
 }
 
 func CreateSession(ctx context.Context, params CreateSessionParams) (aws.Credentials, error) {
@@ -49,13 +55,13 @@ func CreateSession(ctx context.Context, params CreateSessionParams) (aws.Credent
 	}
 
 	var signatureAlgorithm string
-	switch p := params.Signer.Public(); p.(type) {
-	case *ecdsa.PublicKey:
+	switch p := params.Certificate.PublicKeyAlgorithm; p {
+	case x509.ECDSA:
 		signatureAlgorithm = "AWS4-X509-ECDSA-SHA256"
-	case *rsa.PublicKey:
+	case x509.RSA:
 		signatureAlgorithm = "AWS4-X509-RSA-SHA256"
 	default:
-		return aws.Credentials{}, fmt.Errorf("unsupported public key type %T", p)
+		return aws.Credentials{}, fmt.Errorf("unsupported public key algorithm %s", p)
 	}
 
 	reqBody, err := json.Marshal(createSessionInput{
@@ -102,8 +108,7 @@ func CreateSession(ctx context.Context, params CreateSessionParams) (aws.Credent
 
 	scope := fmt.Sprintf("%v/%v/rolesanywhere/aws4_request", now.Format("20060102"), region)
 
-	stringToSign := sha256.New()
-	fmt.Fprintf(stringToSign,
+	stringToSign := fmt.Sprintf(
 		"%v\n%v\n%v\n%x",
 		signatureAlgorithm,
 		xAmzDate,
@@ -111,7 +116,7 @@ func CreateSession(ctx context.Context, params CreateSessionParams) (aws.Credent
 		canonicalRequest.Sum(nil),
 	)
 
-	signature, err := params.Signer.Sign(rand.Reader, stringToSign.Sum(nil), crypto.SHA256)
+	signature, err := params.HashAndSignFunc(stringToSign)
 	if err != nil {
 		return aws.Credentials{}, fmt.Errorf("signing request: %w", err)
 	}
